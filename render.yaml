@@ -1,0 +1,37 @@
+# Blueprint do Render (plano Free) para o backend FastAPI.
+# Render > New > Blueprint > selecione este repositório.
+services:
+  - type: web
+    name: rubrica-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: RECALL_API_KEY
+        sync: false
+      - key: RECALL_REGION
+        sync: false
+      - key: RECALL_TRANSCRIPT_LANGUAGE
+        value: pt
+      - key: WEBHOOK_TOKEN
+        generateValue: true
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: llama-3.3-70b-versatile
