@@ -16,7 +16,7 @@ interface Invite {
 }
 
 function inviteLink(email: string) {
-  return `${window.location.origin}/cadastro?email=${encodeURIComponent(email)}`;
+  return `${window.location.origin}/cadastro/?email=${encodeURIComponent(email)}`;
 }
 
 function Team() {

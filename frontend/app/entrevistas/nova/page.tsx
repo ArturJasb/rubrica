@@ -70,7 +70,7 @@ function NewInterview() {
           body: JSON.stringify({ candidate_name: candidate, job_title: job, transcript, consent_ack: consent }),
         });
       }
-      router.push(`/entrevistas/${created.id}`);
+      router.push(`/entrevistas/ver/?id=${created.id}`);
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

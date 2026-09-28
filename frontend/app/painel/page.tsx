@@ -137,7 +137,7 @@ function Dashboard() {
           <ul className="hits">
             {hits.map((h) => (
               <li key={`${h.interview_id}-${h.idx}`}>
-                <Link href={`/entrevistas/${h.interview_id}?t=${h.idx}`}>
+                <Link href={`/entrevistas/ver/?id=${h.interview_id}&t=${h.idx}`}>
                   <div className="hit-meta">
                     <strong>{h.candidate_name}</strong>
                     {h.job_title && <span className="muted"> · {h.job_title}</span>}
@@ -192,7 +192,7 @@ function Dashboard() {
                 {items.map((i) => (
                   <tr key={i.id}>
                     <td>
-                      <Link href={`/entrevistas/${i.id}`} className="strong-link">
+                      <Link href={`/entrevistas/ver/?id=${i.id}`} className="strong-link">
                         {i.candidate_name}
                       </Link>
                       <div className="muted small">{i.source === "bot" ? "Bot na reunião" : "Transcrição enviada"}</div>

@@ -21,7 +21,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
 
   useEffect(() => {
-    if (!loading && !session) router.replace(`/entrar?next=${encodeURIComponent(path)}`);
+    if (!loading && !session) {
+      // Guarda caminho + query (ex.: /entrevistas/ver/?id=...) para voltar depois do login
+      const here = window.location.pathname + window.location.search;
+      router.replace(`/entrar/?next=${encodeURIComponent(here)}`);
+    }
   }, [loading, session, router, path]);
 
   if (loading || !session) return <Loading full />;
@@ -35,7 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="nav">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className={path === n.href ? "active" : ""}>
+              <Link key={n.href} href={n.href} className={path.replace(/\/$/, "") === n.href ? "active" : ""}>
                 {n.label}
               </Link>
             ))}

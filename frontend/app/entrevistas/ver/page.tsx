@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { DecisionBadge, StatusBadge } from "@/components/Badges";
@@ -59,8 +59,9 @@ function exportText(d: InterviewDetail): string {
 }
 
 function Detail() {
-  const { id } = useParams<{ id: string }>();
+  // Rota estática (/entrevistas/ver/?id=...) para o site poder ser publicado como arquivos estáticos
   const params = useSearchParams();
+  const id = params.get("id") || "";
   const router = useRouter();
   const { me } = useAuth();
   const [d, setD] = useState<InterviewDetail | null>(null);
