@@ -13,19 +13,24 @@ Um bot entra na entrevista no **Google Meet** ou no **Microsoft Teams**, exibe o
 
 | | |
 |---|---|
-| **Aplicação em produção** | https://SEU-PROJETO.vercel.app ← _preencher após o deploy_ |
-| **API (backend)** | https://rubrica-api.onrender.com/health ← _preencher após o deploy_ |
-| **Repositório** | https://github.com/ArturJasb/rubrica ← _ajustar_ |
+| **Aplicação em produção** | https://rubrica-site.onrender.com |
+| **API (backend)** | https://rubrica-api-yjb4.onrender.com/health · documentação: https://rubrica-api-yjb4.onrender.com/docs |
+| **Repositório** | https://github.com/ArturJasb/rubrica |
 
-> ⏳ O backend usa o plano gratuito do Render, que "dorme" após 15 min sem uso. O **primeiro acesso pode levar até 1 minuto** — a interface avisa quando isso acontece.
+> ✅ **Qualquer pessoa pode criar uma conta e usar**: o cadastro é aberto e não exige confirmação por e-mail.
+> O site é estático (não "dorme") e a API é mantida acordada por uma verificação automática a cada 10 min, então não há espera no primeiro acesso.
 
-## 👤 Usuário de teste (para avaliação)
+## 👤 Como testar
+
+**Crie sua própria conta** em https://rubrica-site.onrender.com/cadastro/ (nome, e-mail e senha de 6+ caracteres) — você entra na hora, já como administrador(a) de um workspace novo.
+
+Se preferir uma conta com dados prontos:
 
 | E-mail | Senha |
 |---|---|
 | `avaliador@rubrica.app` | `Rubrica@2026` |
 
-A conta já tem uma entrevista processada. Para testar o fluxo do zero: **Nova entrevista → Colar transcrição → "Preencher com entrevista de exemplo" → Gerar rubrica** (fica pronta em segundos). Para testar o bot, crie uma reunião no Google Meet, cole o link na aba **Enviar bot para a reunião** e admita o bot "Rubrica | Gravando esta entrevista" quando ele pedir para entrar.
+Essa conta já tem uma entrevista processada. Para testar o fluxo do zero: **Nova entrevista → Colar transcrição → "Preencher com entrevista de exemplo" → Gerar rubrica** (fica pronta em segundos). Para testar o bot, crie uma reunião no Google Meet, cole o link na aba **Enviar bot para a reunião** e admita o bot "Rubrica | Gravando esta entrevista" quando ele pedir para entrar.
 
 ---
 
@@ -43,6 +48,7 @@ A conta já tem uma entrevista processada. Para testar o fluxo do zero: **Nova e
 | Extra | Registro de auditoria (quem acessou/editou cada entrevista), visível para o admin | ✅ |
 | Extra | Exclusão sob demanda (apaga transcrição, rubrica e mídia no Recall) e **mídia bruta apagada logo após a transcrição** | ✅ |
 | Extra | "Colar transcrição": processa entrevistas gravadas fora do bot (e permite testar sem uma reunião ao vivo) | ✅ |
+| Extra | Cadastro aberto, sem e-mail de confirmação (qualquer avaliador cria a própria conta e usa na hora) | ✅ |
 | Should | Exportação de texto pronto para colar no ATS | ✅ Parcial (botão "Copiar para o ATS"; sem PDF) |
 
 ### O que ficou de fora e por quê
@@ -62,7 +68,7 @@ A conta já tem uma entrevista processada. Para testar o fluxo do zero: **Nova e
 
 ```mermaid
 flowchart LR
-    U[Recrutador<br/>navegador] -->|HTTPS| FE[Frontend Next.js<br/>Vercel]
+    U[Recrutador<br/>navegador] -->|HTTPS| FE[Frontend Next.js estático<br/>Render Static Site]
     FE -->|login / sessão| SA[Supabase Auth]
     FE -->|REST + JWT| API[Backend FastAPI<br/>Render Free]
     API -->|valida token| SA
@@ -70,7 +76,8 @@ flowchart LR
     API -->|cria bot / busca transcrição| RC[Recall.ai]
     RC -->|bot entra na chamada| MT[Google Meet / Teams]
     RC -->|webhook: chamada terminou| API
-    API -->|transcrição → rubrica JSON| LLM[IA - Groq<br/>Llama 3.3 70B]
+    API -->|transcrição → rubrica JSON| LLM[IA - Groq<br/>gpt-oss-120b]
+    CR[pg_cron no Supabase] -.->|GET /health a cada 10 min| API
 ```
 
 **Fluxo principal:** cadastro/login → Nova entrevista (link do Meet/Teams) → bot entra e exibe o aviso LGPD → chamada termina → Recall.ai avisa por webhook → API baixa a transcrição, apaga a mídia bruta e gera a rubrica → recrutador revisa, edita e copia para o ATS.
@@ -81,12 +88,13 @@ Se o servidor gratuito estiver dormindo e perder o webhook, a página da entrevi
 
 | Camada | Tecnologia | Hospedagem |
 |---|---|---|
-| Frontend | Next.js 15 (React 19, TypeScript) | **Vercel** (Hobby) |
+| Frontend | Next.js 15 (React 19, TypeScript), exportado como site estático | **Render Static Site** (Free, CDN — não dorme) |
 | Backend | Python 3.11, FastAPI, SQLAlchemy | **Render** (Free) |
-| Banco de dados | PostgreSQL | **Supabase** (Free, região São Paulo) |
+| Banco de dados | PostgreSQL (schema `rubrica`, fora da API pública) | **Supabase** (Free, região São Paulo `sa-east-1`) |
 | Autenticação | Supabase Auth (e-mail e senha) | Supabase |
-| Bot de reunião + transcrição | Recall.ai (`recallai_streaming`, pt) | Recall.ai (5 h grátis) |
-| Geração da rubrica | Llama 3.3 70B via API compatível com OpenAI | **Groq** (Free) — trocável por Gemini/OpenAI por variável de ambiente |
+| Bot de reunião + transcrição | Recall.ai (`recallai_streaming`, pt) | Recall.ai, região `eu-central-1` (5 h grátis) |
+| Geração da rubrica | `openai/gpt-oss-120b` via API compatível com OpenAI | **Groq** (Free) — trocável por Gemini/OpenAI por variável de ambiente |
+| API sempre acordada | `pg_cron` + `pg_net` chamando `/health` a cada 10 min | Supabase |
 
 ## 📁 Estrutura
 
@@ -97,13 +105,14 @@ rubrica/
 │   │   ├── main.py          # app, CORS, rotas
 │   │   ├── auth.py          # valida o token do Supabase, workspace e papéis
 │   │   ├── models.py        # tabelas (workspaces, members, invites, interviews, transcript_segments, audit_logs)
-│   │   ├── routers/         # interviews, team, webhooks
+│   │   ├── routers/         # interviews, team, webhooks, signup (cadastro aberto)
 │   │   └── services/        # recall.py (bot), llm.py (rubrica), pipeline.py, transcript.py
 │   ├── scripts/             # usuário de teste, transcrição de exemplo, imagem do aviso LGPD
+│   ├── sql/                 # papel do banco, função de cadastro e verificação automática (rodar no Supabase)
 │   ├── tests/               # testes automatizados (pytest)
 │   └── requirements.txt
 ├── frontend/                # Next.js
-│   ├── app/                 # páginas: /, /entrar, /cadastro, /painel, /entrevistas/nova, /entrevistas/[id], /time
+│   ├── app/                 # páginas: /, /entrar, /cadastro, /painel, /entrevistas/nova, /entrevistas/ver/?id=, /time
 │   ├── components/
 │   └── lib/                 # cliente da API, Supabase, tipos
 ├── docs/DEPLOY.md           # passo a passo de publicação
@@ -153,13 +162,15 @@ Todas estão documentadas em [`backend/.env.example`](backend/.env.example) e [`
 - **Minimização:** áudio e vídeo brutos são apagados no Recall.ai assim que a transcrição é salva (`RECALL_DELETE_MEDIA=true`).
 - **Exclusão sob demanda:** o botão "Excluir" apaga transcrição, rubrica e mídia.
 - **Controle de acesso por papel** (admin, recrutador, gestor) e **registro de auditoria** de acessos e edições.
-- TLS em todo o tráfego (Vercel, Render e Supabase); dados em repouso criptografados pelo Supabase (AES-256), na região de São Paulo.
+- Tabelas num schema próprio (`rubrica`) acessado só pelo papel do backend: não ficam expostas pela API pública do Supabase.
+- TLS em todo o tráfego (Render e Supabase); dados em repouso criptografados pelo Supabase (AES-256), na região de São Paulo.
 - A IA é instruída a não considerar características pessoais protegidas, e a interface lembra que a decisão final é humana.
 
 ## 🗺️ API (resumo)
 
 | Método | Rota | Descrição |
 |---|---|---|
+| POST | `/api/auth/signup` | Cadastro aberto: cria a conta já confirmada (limite de 10 por IP a cada 10 min) |
 | GET | `/api/me` | Usuário, papel e workspace (cria o workspace no primeiro login ou aceita convite) |
 | GET | `/api/interviews` | Lista as entrevistas do workspace |
 | POST | `/api/interviews` | Cria entrevista e envia o bot à reunião |

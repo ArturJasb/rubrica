@@ -1,6 +1,6 @@
 # Guia de publicação: Rubrica no ar em ~1 hora (custo zero)
 
-Ordem: **Supabase → Groq → Recall.ai → GitHub → Render → Vercel → ajustes finais → usuário de teste → teste pós-soneca.**
+Ordem: **Supabase → Groq → Recall.ai → GitHub → Render (API) → Render (site estático) → ajustes finais → usuário de teste → teste pós-soneca.**
 Anote cada chave num bloco de notas **local** (nunca no repositório).
 
 ---
@@ -11,11 +11,13 @@ Anote cada chave num bloco de notas **local** (nunca no repositório).
    - Nome: `rubrica` · **Region: South America (São Paulo)** · crie e **guarde a senha do banco**.
 2. **Project Settings → API**: copie a **Project URL** (`SUPABASE_URL`) e a **anon public key** (`SUPABASE_ANON_KEY`).
    Se aparecer "Publishable key" em vez de "anon", use a publishable. As duas funcionam.
-3. Clique em **Connect** (topo) → aba **Session pooler** → copie a URI, que começa com `postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`.
-   Troque `[YOUR-PASSWORD]` pela senha do passo 1. Essa URI é o `DATABASE_URL`.
+3. No **SQL Editor**, rode os scripts de `backend/sql/` na ordem (troque a senha no `001`):
+   - `001_papel_e_schema.sql`: cria o papel `rubrica_api` e o schema `rubrica` (fora da API pública).
+   - `002_cadastro_sem_confirmacao.sql`: cadastro aberto, sem e-mail de confirmação.
+   - `003_manter_api_acordada.sql`: rode depois do passo 5, com a URL real da API.
+4. O `DATABASE_URL` usa o **Session pooler** com o papel próprio:
+   `postgresql://rubrica_api.SEU_REF:SENHA@aws-0-sa-east-1.pooler.supabase.com:5432/postgres`
    ⚠️ Use o **pooler**, não a "Direct connection": o Render não acessa IPv6 e a conexão direta falha.
-4. **Authentication → Sign In / Providers → Email**: **desative "Confirm email"** e salve.
-   Assim o avaliador consegue criar conta e entrar na hora.
 
 ## 2. Groq: IA grátis (3 min)
 
@@ -49,9 +51,9 @@ Antes do push, confira que **nenhum `.env` aparece** em `git status`.
 
 | Variável | Valor |
 |---|---|
-| `DATABASE_URL` | URI do Session pooler (passo 1.3) |
+| `DATABASE_URL` | URI do Session pooler com o papel `rubrica_api` (passo 1.4) |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | passo 1.2 |
-| `CORS_ORIGINS` | por enquanto `http://localhost:3000`; no passo 7 você troca pela URL da Vercel |
+| `CORS_ORIGINS` | por enquanto `http://localhost:3000`; no passo 7 você troca pela URL do site |
 | `RECALL_API_KEY` / `RECALL_REGION` | passo 3 |
 | `LLM_API_KEY` | passo 2 |
 
@@ -60,19 +62,24 @@ Antes do push, confira que **nenhum `.env` aparece** em `git status`.
 
 Se o blueprint der problema: **New → Web Service**, Root Directory `backend`, Build `pip install -r requirements.txt`, Start `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, plano Free. Depois adicione as variáveis do `backend/.env.example`.
 
-## 6. Vercel: frontend (5 min)
+## 6. Render: site estático (5 min)
 
-1. Em https://vercel.com, vá em **Add New → Project** e importe o repositório.
-2. **Root Directory: `frontend`** (importante!). O framework é detectado como Next.js.
-3. Em **Environment Variables**:
+O frontend é exportado como arquivos estáticos (`output: "export"` no `next.config.ts`), então roda como **Static Site**, que é servido por CDN e **não dorme**.
+
+1. No Render, **New → Static Site** e escolha o repositório.
+2. Build Command: `cd frontend && npm ci && npm run build` · Publish Directory: `frontend/out`.
+3. Variáveis de ambiente:
+   - `NODE_VERSION=22`
    - `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`: passo 1.2
-   - `NEXT_PUBLIC_API_URL`: URL do Render, sem barra no final
-4. Clique em **Deploy** e copie a URL (ex.: `https://rubrica-xyz.vercel.app`).
+   - `NEXT_PUBLIC_API_URL`: URL da API no Render, sem barra no final
+4. Copie a URL (em produção: `https://rubrica-site.onrender.com`).
+
+Também funciona na Vercel (Root Directory `frontend`), se preferir.
 
 ## 7. Ajustes finais (5 min)
 
-1. **Render → Environment**: `CORS_ORIGINS=https://rubrica-xyz.vercel.app`. Salve (o serviço reinicia sozinho).
-2. **Supabase → Authentication → URL Configuration**: em **Site URL**, coloque a URL da Vercel.
+1. **Render → Environment** da API: `CORS_ORIGINS=https://rubrica-site.onrender.com`. Salve (o serviço reinicia sozinho).
+2. **Supabase → Authentication → URL Configuration**: em **Site URL**, coloque a URL do site.
 3. **Recall.ai → Webhooks → Add Endpoint**:
    - URL: `https://rubrica-api.onrender.com/api/webhooks/recall?token=SEU_WEBHOOK_TOKEN`
    - Eventos: marque os de status do bot (`bot.*`, principalmente `bot.done` e `bot.fatal`).
@@ -92,20 +99,20 @@ Isso cria `avaliador@rubrica.app` / `Rubrica@2026` com uma entrevista de exemplo
 
 ## 9. Teste de ponta a ponta em produção (15 min)
 
-1. Abra a URL da Vercel numa **janela anônima** → Criar conta → Nova entrevista → Colar transcrição → exemplo → Gerar rubrica.
+1. Abra a URL do site numa **janela anônima** → Criar conta → Nova entrevista → Colar transcrição → exemplo → Gerar rubrica.
 2. **Teste do bot:** crie uma reunião no Google Meet (meet.new) e cole o link em "Enviar bot para a reunião". Em 1–2 min o bot pede para entrar: **admita-o**. Confira a imagem "GRAVANDO" e a mensagem no chat. Converse 2–3 minutos em português (um faz o recrutador, outro o candidato) e encerre a chamada. Em poucos minutos a rubrica aparece.
 3. Tire **prints das telas em produção** para o relatório.
 4. **Teste pós-soneca:** espere 20 min sem usar, abra de novo e confirme que tudo volta depois do carregamento inicial.
-5. **Opcional, recomendado na janela de avaliação:** em https://cron-job.org, crie um job gratuito que acessa `https://rubrica-api.onrender.com/health` a cada 10 min. Assim o avaliador não pega o servidor dormindo.
+5. A API fica acordada pelo `003_manter_api_acordada.sql` (Supabase chama `/health` a cada 10 min). Alternativa: um job gratuito no https://cron-job.org.
 
 ## Problemas comuns
 
 | Sintoma | Causa provável |
 |---|---|
-| Tela diz "Não foi possível conectar ao servidor" | `NEXT_PUBLIC_API_URL` errado, ou `CORS_ORIGINS` sem a URL da Vercel |
+| Tela diz "Não foi possível conectar ao servidor" | `NEXT_PUBLIC_API_URL` errado, ou `CORS_ORIGINS` sem a URL do site |
 | "Sessão inválida" logo após o login | `SUPABASE_URL`/`SUPABASE_ANON_KEY` do backend diferentes dos do frontend |
 | Deploy do Render falha ao conectar no banco | Usou a "Direct connection"; troque pela URI do **Session pooler** |
-| Cadastro diz "confirme seu e-mail" | "Confirm email" continua ativo no Supabase (passo 1.4) |
+| Cadastro diz "confirme seu e-mail" | A função do `002_cadastro_sem_confirmacao.sql` não foi criada (o site cai no cadastro padrão do Supabase) |
 | Rubrica com "Falha ao gerar a rubrica" | `LLM_API_KEY` inválida ou limite da Groq; use "Gerar de novo" ou troque para o Gemini |
 | Bot não entra | Ninguém o admitiu na sala de espera, ou a reunião exige conta da organização |
 

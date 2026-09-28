@@ -8,7 +8,7 @@ Rode do seu computador, depois do deploy:
         --supabase-url https://SEU_REF.supabase.co --anon-key SUA_ANON_KEY \
         --api-url https://rubrica-api.onrender.com
 
-Requer "Confirm email" DESATIVADO no Supabase (Authentication > Sign In / Providers > Email).
+Hoje a conta do avaliador já existe em produção; o script é só para recriar o ambiente.
 """
 import argparse
 import sys
