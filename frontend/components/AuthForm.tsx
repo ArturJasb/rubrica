@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Logo from "./Logo";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
@@ -41,15 +42,29 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
     try {
       const sb = supabase();
       if (mode === "signup") {
-        const { data, error } = await sb.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/painel` },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setInfo("Conta criada! Enviamos um link de confirmação para o seu e-mail.");
-          return;
+        // Cadastro aberto: a API cria a conta já confirmada e entramos em seguida
+        let created = false;
+        try {
+          await api("/api/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) });
+          created = true;
+        } catch (err) {
+          // 501 = backend local sem Supabase: usa o cadastro padrão do Supabase
+          if (!(err instanceof ApiError && err.status === 501)) throw err;
+        }
+        if (created) {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        } else {
+          const { data, error } = await sb.auth.signUp({
+            email,
+            password,
+            options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/painel` },
+          });
+          if (error) throw error;
+          if (!data.session) {
+            setInfo("Conta criada! Enviamos um link de confirmação para o seu e-mail.");
+            return;
+          }
         }
       } else {
         const { error } = await sb.auth.signInWithPassword({ email, password });

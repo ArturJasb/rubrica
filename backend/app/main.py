@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db import Base, engine
-from .routers import interviews, team, webhooks
+from .routers import interviews, signup, team, webhooks
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,6 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(signup.router)
 app.include_router(team.router)
 app.include_router(interviews.router)
 app.include_router(webhooks.router)

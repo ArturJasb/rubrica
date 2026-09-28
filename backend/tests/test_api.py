@@ -210,3 +210,14 @@ def test_llm_json_extraction():
     raw = 'Aqui está:\n```json\n{"resumo": "ok", "recomendacao": "não avançar"}\n```'
     r = llm.normalize_rubric(llm._extract_json(raw))
     assert r["resumo"] == "ok" and r["recomendacao"]["decisao"] == "nao_avancar"
+
+
+def test_signup_requires_postgres_locally(client):
+    # Com SQLite (local/testes) o cadastro direto responde 501 e o frontend usa o Supabase
+    r = client.post("/api/auth/signup", json={"name": "Ana", "email": "ana@empresa.com", "password": "segredo1"})
+    assert r.status_code == 501
+
+
+def test_signup_validates_input(client):
+    r = client.post("/api/auth/signup", json={"name": "A", "email": "nao-e-email", "password": "123"})
+    assert r.status_code == 422
